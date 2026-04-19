@@ -1,4 +1,4 @@
-# CurrículoSENAI 📄
+# CurrículoSENAI
 
 Sistema moderno de **Gestão de Currículos** desenvolvido com Next.js 14, Tailwind CSS e as melhores práticas de desenvolvimento frontend.
 
