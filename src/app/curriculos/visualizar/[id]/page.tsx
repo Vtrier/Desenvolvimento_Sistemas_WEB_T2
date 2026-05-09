@@ -1,47 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useState } from "react";
 import { Header } from "@/components/global/Header";
 import { Footer } from "@/components/global/Footer";
 import { CurriculoDetailSkeleton } from "@/components/ui/skeleton";
-import { useCurriculos } from "@/hooks/useCurriculos";
-import { Curriculo } from "@/data/curriculos";
+import { BadgeAnalise, ListaSugestoes } from "@/components/curriculos/SugestoesCurriculo";
+import { useCurriculoDetalhe, useCurriculos } from "@/hooks/useCurriculos";
+import { analisarCurriculo } from "@/utils/sugestoesCurriculo";
 import {
-  FiArrowLeft, FiTrash2, FiMail, FiPhone, FiMapPin,
-  FiCalendar, FiGithub, FiLinkedin,
+  FiArrowLeft, FiTrash2, FiEdit2,
+  FiMail, FiPhone, FiMapPin, FiCalendar,
+  FiGithub, FiLinkedin,
 } from "react-icons/fi";
 
 export default function DetalhePage() {
   const params = useParams();
+  const id = Array.isArray(params.id) ? params.id[0] : (params.id ?? "");
   const router = useRouter();
-  const { getCurriculo, deleteCurriculo, loading } = useCurriculos();
-  const [curriculo, setCurriculo] = useState<Curriculo | null>(null);
+  const { curriculo, loading, erro } = useCurriculoDetalhe(id);
+  const { deleteCurriculo } = useCurriculos();
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    if (!loading) {
-      const found = getCurriculo(params.id as string);
-      if (found) setCurriculo(found);
-      else {
-        toast.error("Currículo não encontrado");
-        router.push("/curriculos/visualizar");
-      }
-    }
-  }, [loading, params.id]);
+  if (erro) {
+    toast.error(erro);
+    router.push("/curriculos/visualizar");
+    return null;
+  }
 
-  const handleDelete = async () => {
+  async function handleDelete() {
     if (!curriculo) return;
     if (!confirm(`Excluir o currículo de ${curriculo.nome}?`)) return;
     setDeleting(true);
-    await new Promise((r) => setTimeout(r, 500));
-    deleteCurriculo(curriculo.id);
-    toast.success("Currículo excluído com sucesso.");
-    router.push("/curriculos/visualizar");
-  };
+    try {
+      await deleteCurriculo(curriculo.id);
+      toast.success("Currículo excluído com sucesso.");
+      router.push("/curriculos/visualizar");
+    } catch {
+      toast.error("Erro ao excluir currículo.");
+      setDeleting(false);
+    }
+  }
+
+  const analise = curriculo ? analisarCurriculo(curriculo) : null;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -62,7 +66,7 @@ export default function DetalhePage() {
                     <Image src={curriculo.foto} alt={curriculo.nome} fill className="object-cover" unoptimized />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center font-bold text-blue-600 bg-blue-50 text-xl">
-                      {curriculo.nome.charAt(0)}
+                      {curriculo.nome?.charAt(0)}
                     </div>
                   )}
                 </div>
@@ -90,14 +94,33 @@ export default function DetalhePage() {
                     </div>
                   )}
                 </div>
-                <button onClick={handleDelete} disabled={deleting} className="btn-danger text-xs flex-shrink-0">
-                  {deleting
-                    ? <span className="animate-spin inline-block h-3.5 w-3.5 border-2 border-red-300 border-t-red-600 rounded-full" />
-                    : <FiTrash2 size={14} />}
-                  Excluir
-                </button>
+
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  <Link href={`/curriculos/editar/${curriculo.id}`} className="btn btn-outline text-xs">
+                    <FiEdit2 size={13} /> Editar
+                  </Link>
+                  <button onClick={handleDelete} disabled={deleting} className="btn btn-danger text-xs">
+                    {deleting
+                      ? <span className="animate-spin inline-block h-3.5 w-3.5 border-2 border-red-300 border-t-red-600 rounded-full" />
+                      : <FiTrash2 size={13} />}
+                    Excluir
+                  </button>
+                </div>
               </div>
+
+              {analise && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <BadgeAnalise pontuacao={analise.pontuacao} sugestoes={analise.sugestoes} />
+                </div>
+              )}
             </div>
+
+            {analise && analise.sugestoes.length > 0 && (
+              <div className="card">
+                <p className="section-title">Sugestões de melhoria</p>
+                <ListaSugestoes sugestoes={analise.sugestoes} />
+              </div>
+            )}
 
             <div className="card">
               <p className="section-title">Dados Pessoais</p>
@@ -117,7 +140,7 @@ export default function DetalhePage() {
             <div className="card">
               <p className="section-title">Habilidades</p>
               <div className="flex flex-wrap gap-2">
-                {curriculo.habilidades.map((h) => (
+                {(curriculo.habilidades || []).map((h) => (
                   <span key={h} className="badge">{h}</span>
                 ))}
               </div>
@@ -125,38 +148,46 @@ export default function DetalhePage() {
 
             <div className="card">
               <p className="section-title">Experiência Profissional</p>
-              <div className="space-y-4">
-                {curriculo.experiencias.map((exp, i) => (
-                  <div key={i} className="pl-4 border-l-2 border-blue-200">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-gray-800 text-sm">{exp.cargo}</p>
-                        <p className="text-blue-600 text-sm">{exp.empresa}</p>
+              {curriculo.experiencias?.length > 0 ? (
+                <div className="space-y-4">
+                  {curriculo.experiencias.map((exp, i) => (
+                    <div key={i} className="pl-4 border-l-2 border-blue-200">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-gray-800 text-sm">{exp.cargo}</p>
+                          <p className="text-blue-600 text-sm">{exp.empresa}</p>
+                        </div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">{exp.dataInicio} — {exp.dataFim}</span>
                       </div>
-                      <span className="text-xs text-gray-400 whitespace-nowrap">{exp.dataInicio} — {exp.dataFim}</span>
+                      <p className="text-sm text-gray-500 mt-1 leading-relaxed">{exp.descricao}</p>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1 leading-relaxed">{exp.descricao}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">Nenhuma experiência cadastrada.</p>
+              )}
             </div>
 
             <div className="card">
               <p className="section-title">Formação Acadêmica</p>
-              <div className="space-y-4">
-                {curriculo.formacoes.map((form, i) => (
-                  <div key={i} className="pl-4 border-l-2 border-green-200">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-gray-800 text-sm">{form.curso}</p>
-                        <p className="text-gray-500 text-sm">{form.instituicao}</p>
-                        <span className="badge-gray mt-1 inline-block">{form.nivel}</span>
+              {curriculo.formacoes?.length > 0 ? (
+                <div className="space-y-4">
+                  {curriculo.formacoes.map((form, i) => (
+                    <div key={i} className="pl-4 border-l-2 border-green-200">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-gray-800 text-sm">{form.curso}</p>
+                          <p className="text-gray-500 text-sm">{form.instituicao}</p>
+                          <span className="badge-gray mt-1 inline-block">{form.nivel}</span>
+                        </div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">{form.dataInicio} — {form.dataFim}</span>
                       </div>
-                      <span className="text-xs text-gray-400 whitespace-nowrap">{form.dataInicio} — {form.dataFim}</span>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">Nenhuma formação cadastrada.</p>
+              )}
             </div>
           </div>
         )}

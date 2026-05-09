@@ -1,53 +1,75 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Curriculo, MOCK_CURRICULOS } from "@/data/curriculos";
-
-const STORAGE_KEY = "curriculos_data";
+import { useState, useEffect, useCallback } from "react";
+import {
+  listarCurriculos,
+  criarCurriculo,
+  buscarCurriculoPorId,
+  atualizarCurriculo,
+  excluirCurriculo,
+} from "@/lib/curriculoService";
+import { Curriculo } from "@/data/curriculos";
 
 export function useCurriculos() {
   const [curriculos, setCurriculos] = useState<Curriculo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          setCurriculos(JSON.parse(stored));
-        } else {
-          setCurriculos(MOCK_CURRICULOS);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_CURRICULOS));
-        }
-      } catch {
-        setCurriculos(MOCK_CURRICULOS);
-      }
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const dados = await listarCurriculos();
+      setCurriculos(dados);
+    } catch (e) {
+      console.error(e);
+      setErro("Não foi possível carregar os currículos.");
+    } finally {
       setLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
+    }
   }, []);
 
-  const addCurriculo = (curriculo: Omit<Curriculo, "id" | "createdAt">) => {
-    const novo: Curriculo = {
-      ...curriculo,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [...curriculos, novo];
-    setCurriculos(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return novo;
-  };
+  useEffect(() => { carregar(); }, [carregar]);
 
-  const deleteCurriculo = (id: string) => {
-    const updated = curriculos.filter((c) => c.id !== id);
-    setCurriculos(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  };
+  async function addCurriculo(dados: Omit<Curriculo, "id" | "createdAt" | "updatedAt">): Promise<string> {
+    const id = await criarCurriculo(dados);
+    await carregar();
+    return id;
+  }
 
-  const getCurriculo = (id: string) => {
-    return curriculos.find((c) => c.id === id);
-  };
+  async function updateCurriculo(id: string, dados: Partial<Omit<Curriculo, "id">>): Promise<void> {
+    await atualizarCurriculo(id, dados);
+    await carregar();
+  }
 
-  return { curriculos, loading, addCurriculo, deleteCurriculo, getCurriculo };
+  async function deleteCurriculo(id: string): Promise<void> {
+    await excluirCurriculo(id);
+    setCurriculos((prev) => prev.filter((c) => c.id !== id));
+  }
+
+  function getCurriculo(id: string): Curriculo | null {
+    return curriculos.find((c) => c.id === id) ?? null;
+  }
+
+  return { curriculos, loading, erro, carregar, addCurriculo, updateCurriculo, deleteCurriculo, getCurriculo };
+}
+
+export function useCurriculoDetalhe(id: string) {
+  const [curriculo, setCurriculo] = useState<Curriculo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    buscarCurriculoPorId(id)
+      .then((dados) => {
+        setCurriculo(dados);
+        if (!dados) setErro("Currículo não encontrado.");
+      })
+      .catch(() => setErro("Erro ao buscar currículo."))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  return { curriculo, loading, erro };
 }

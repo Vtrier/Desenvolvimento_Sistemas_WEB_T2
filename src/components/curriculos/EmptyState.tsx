@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { FiFileText } from "react-icons/fi";
 
-export function EmptyState({ filtered = false }: { filtered?: boolean }) {
+interface EmptyStateProps {
+  filtered?: boolean;
+}
+
+export function EmptyState({ filtered = false }: EmptyStateProps) {
   return (
     <div className="text-center py-16">
       <FiFileText size={40} className="text-gray-300 mx-auto mb-3" />
@@ -9,14 +13,10 @@ export function EmptyState({ filtered = false }: { filtered?: boolean }) {
         {filtered ? "Nenhum resultado encontrado" : "Nenhum currículo cadastrado"}
       </p>
       <p className="text-sm text-gray-400 mb-5">
-        {filtered
-          ? "Tente buscar por outro nome ou cargo."
-          : "Cadastre o primeiro currículo para começar."}
+        {filtered ? "Tente buscar por outro nome ou cargo." : "Cadastre o primeiro currículo para começar."}
       </p>
       {!filtered && (
-        <Link href="/curriculos/cadastrar" className="btn-primary">
-          Cadastrar currículo
-        </Link>
+        <Link href="/curriculos/cadastrar" className="btn btn-primary">Cadastrar currículo</Link>
       )}
     </div>
   );

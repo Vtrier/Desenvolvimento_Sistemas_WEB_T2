@@ -1,6 +1,6 @@
 {
   "name": "curriculos-app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -18,7 +18,8 @@
     "sonner": "^1.5.0",
     "react-icons": "^5.2.1",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.4.0"
+    "tailwind-merge": "^2.4.0",
+    "firebase": "^10.12.2"
   },
   "devDependencies": {
     "typescript": "^5",
